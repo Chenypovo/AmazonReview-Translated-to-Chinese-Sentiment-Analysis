@@ -1,79 +1,221 @@
-# AmazonReview-Chinese-Sentiment-Analysis
+# 🎵 Amazon Review Chinese Sentiment Analysis
 
-## Overview
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-ee4c2c.svg?logo=pytorch)](https://pytorch.org/)
+[![Qwen](https://img.shields.io/badge/Model-Qwen3-purple.svg)](https://qwenlm.github.io/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This project firstly translates the 2023 Amazon Review of Digital_Music into Chinese using Qwen API, then performs a 3-class sentiment analysis based on the data (around 10,000 comments) in LLaMA Factory.
+**基于 Qwen 翻译 + LLaMA Factory 微调的亚马逊音乐评论中文情感分析系统**
 
-## Key Results
-2 models are fine-tuned: Qwen3-0.6B-base and Qwen3-4B-instruct-2057. 
-Qwen3-4B-Instruct-2507: with 5-shot prompting on 2,000 samples, the model achieves **78.25%** accuracy with an average latency of **1.466 s/sample**. The same model in **zero-shot** yields **77.25%** (**0.523 s/sample**), in **5-shot** yields **78.25%** (**1.47 s/sample**), and in **10-shot** yields **82.75%** (**14.517 s/sample**).
+---
 
-For smaller models with locally merged weights, the two **Qwen3-0.6B** zero-shot runs achieve **57.15%** (**0.075 s/sample**) and **54.35%** (**0.061 s/sample**), with the corresponding **5-shot** results **79.66%** (**0.26 s/sample**).
+## 📖 目录
 
-Overall, the 4B instruction model delivers the best result this round at **82.75%** with a reasonable few-shot size, but the time delay is far beyond industrial demand. Perform a LoRA fine-tune on 0.6B's 5-shot may be a satisfactory plan.
+- [项目简介](#-项目简介)
+- [核心成果](#-核心成果)
+- [技术架构](#-技术架构)
+- [快速开始](#-快速开始)
+- [项目结构](#-项目结构)
+- [详细文档](#-详细文档)
+- [引用](#-引用)
 
-## Repository Structure
-TO DO
+---
 
-## Getting Started
-To reproduce the results in this repository, please follow the steps below.
-### Prerequisites
-This project requires modules listed in the `requirements.txt` file, or you can follow the steps below. Do pay attention that new versions of **Hugging Face**'s **datasets** module DOES NOT support running data's author's remote script to download the dataset. One way (in which I used) is downgrading **datasets** to a certain version, listed in `requirements.txt`, then using the script to download.
+## 🌟 项目简介
 
-### Installation
-1. **Data download**:
-Go to HuggingFace's dataset part and find Amazon-Review 2023. Or you can click this link directly: https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023
-Choose any review you like, just change other variable names as well. Using `data_retrive.py` to retrieve data:
-```bash
-python sripts/data_retrive.py
+本项目对 2023 年亚马逊数字音乐评论（Amazon Reviews 2023 - Digital Music）进行：
+
+1. **中文翻译** - 使用 Qwen API 将约 10,000 条英文评论翻译为中文
+2. **情感分析** - 基于 LLaMA Factory 进行 3 类情感分类（正面/中性/负面）
+
+### 为什么做这个？
+
+- 🌏 中文 NLP 研究需要高质量的中文情感数据集
+- 🎯 探索小模型（0.6B）vs 中等模型（4B）在 few-shot 场景下的表现平衡
+- ⚡ 研究推理延迟与准确率的 trade-off，为工业部署提供参考
+
+---
+
+## 📊 核心成果
+
+| 模型 | 设置 | 准确率 | 延迟/样本 | 备注 |
+|------|------|--------|-----------|------|
+| **Qwen3-4B-Instruct** | 10-shot | **82.75%** | 14.52s | 最佳准确率 |
+| Qwen3-4B-Instruct | 5-shot | 78.25% | 1.47s | 平衡选择 |
+| Qwen3-4B-Instruct | Zero-shot | 77.25% | 0.52s | 最快推理 |
+| Qwen3-0.6B-Base | 5-shot | 79.66% | 0.26s | 小模型黑马 |
+| Qwen3-0.6B-Base | Zero-shot | 54.35% | 0.06s | 基线参考 |
+
+### 关键发现
+
+- ✅ **4B 指令模型**在 10-shot 下达到最佳结果（82.75%），但延迟较高
+- ✅ **0.6B 小模型**在 5-shot 下表现惊人（79.66%），延迟仅 0.26s
+- 💡 推荐方案：对 0.6B 进行 LoRA 微调，平衡性能与部署成本
+
+---
+
+## 🏗️ 技术架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    数据流水线 (Data Pipeline)                │
+├─────────────────────────────────────────────────────────────┤
+│  原始数据 (HuggingFace) → Qwen 翻译 → 数据增强 → 格式转换    │
+│       ↓                    ↓              ↓              ↓   │
+│   Amazon-Reviews     英→中翻译      少数类增强    LLaMA-Factory │
+│   2023 Digital       (并发处理)    (minority)     (.jsonl)    │
+│   Music (EN)                                          ↓       │
+│                                                  模型训练      │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    模型评估 (Evaluation)                     │
+├─────────────────────────────────────────────────────────────┤
+│  Qwen3-4B-Instruct  │  Qwen3-0.6B-Base  │  对比分析          │
+│  - Zero/5/10-shot   │  - Zero/5-shot    │  - 准确率 vs 延迟  │
+│  - 78.25% ~ 82.75%  │  - 54.35% ~ 79.66%│  - 工业部署建议    │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-3. **Install PyTorch with CUDA**:
-   
-Visit the [PyTorch official website](https://pytorch.org/get-started/locally/) and get the correct installation command for your specific CUDA version. For example:
-```bash
-pip3 install torch torchvision torchaudio --index-url [https://download.pytorch.org/whl/cu121](https://download.pytorch.org/whl/cu121)
-```
+---
 
-3. **Install LLama Factory**
-   
-Clone and install the LLaMA-Factory framework, further train log, evaluated predicitons, etc will be saved in this file accordingly.
+## 🚀 快速开始
+
+### 环境要求
+
+- Python 3.10+
+- CUDA 11.7+ (GPU 加速)
+- 8GB+ VRAM (4B 模型), 4GB+ VRAM (0.6B 模型)
+
+### 1️⃣ 安装依赖
+
 ```bash
-git clone [https://github.com/hiyouga/LLaMA-Factory.git](https://github.com/hiyouga/LLaMA-Factory.git)
+# 创建虚拟环境
+conda create -n llama_env python=3.10 -y
+conda activate llama_env
+
+# 安装 PyTorch (根据你的 CUDA 版本调整)
+pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# 安装项目依赖
+pip install -r requirements.txt
+
+# 安装 LLaMA Factory
+git clone https://github.com/hiyouga/LLaMA-Factory.git
 cd LLaMA-Factory
 pip install -e ".[torch,bitsandbytes,webui,api]"
 cd ..
 ```
 
-4. Create and Activate Conda Environment (Optional but recommended)
-   
-Use a clean environment named `llama_env` (or any name you prefer) with Python 3.10.
+### 2️⃣ 配置 API Key
+
 ```bash
-conda create -n llama_env python=3.10 -y
-conda activate llama_env
+# 设置 Qwen API Key
+export QWEN_API_KEY="your_api_key_here"
+
+# 或添加到 .env 文件
+echo "QWEN_API_KEY=your_api_key_here" > .env
 ```
 
-5. **Install Project Dependencies**
-TO DO
+### 3️⃣ 数据准备
 
-6. **Set Up Environmental Variables:**:
-Set up your API key (choose one you prefer) using
 ```bash
-QWEN_API_KEY="your_api_key_here"
+# 下载数据集 (HuggingFace)
+python task1/scripts/data_retrive.py
+
+# 翻译为中文
+python task1/src/translate.py
+
+# 数据增强 (少数类)
+python task1/src/data_aug.py
+
+# 转换为 LLaMA Factory 格式
+python task1/prepare_llamafactory_data.py
+```
+
+### 4️⃣ 训练与评估
+
+```bash
+# 训练基线模型
+python task1/src/train_baseline_5class.py
+
+# 本地评估
+python task1/qwen_eval_local.py
+
+# 烟雾测试
+python task1/qwen_smoke.py
+```
+
+---
+
+## 📁 项目结构
 
 ```
-API Key setup for English users: [API guide here :)](https://www.immersivelimit.com/tutorials/adding-your-openai-api-key-to-system-environment-variables)
+AmazonReview-Chinese-Sentiment-Analysis/
+├── README.md                      # 项目文档
+├── requirements.txt               # Python 依赖
+├── TRAINING_DATASET_FINAL.csv     # 训练数据集
+├── task1/
+│   ├── scripts/
+│   │   └── data_retrive.py        # 数据下载脚本
+│   ├── src/
+│   │   ├── translate.py           # 翻译模块
+│   │   ├── data_aug.py            # 数据增强
+│   │   ├── train.py               # 训练脚本
+│   │   ├── evaluate_local_llm.py  # 本地评估
+│   │   ├── model.py               # 模型定义
+│   │   ├── dataset.py             # 数据集处理
+│   │   └── loss.py                # 损失函数
+│   ├── notebook/
+│   │   ├── data_aug.ipynb         # 数据增强 Notebook
+│   │   ├── data_aug_clean.ipynb   # 数据清洗 Notebook
+│   │   └── llama_fac.ipynb        # LLaMA Factory 格式转换
+│   ├── prepare_llamafactory_data.py
+│   ├── qwen_eval_local.py         # Qwen 评估脚本
+│   ├── qwen_smoke.py              # 烟雾测试
+│   └── problems_encountered.md    # 问题记录
+└── .gitignore
+```
 
-API key setup for Chinese users: [API guide here :)](https://blog.csdn.net/tenc1239/article/details/133040806#:~:text=%E6%9C%AC%E6%96%87%E4%BB%8B%E7%BB%8D%E4%BA%86%E5%A6%82%E4%BD%95%E9%80%9A%E8%BF%87%E8%AE%BE%E7%BD%AE%E7%8E%AF%E5%A2%83%E5%8F%98%E9%87%8F%E5%AD%98%E5%82%A8OpenAIAPI%E5%AF%86%E9%92%A5%EF%BC%8C%E4%BB%A5%E5%87%8F%E5%B0%91%E7%9B%B4%E6%8E%A5%E4%BB%A3%E7%A0%81%E4%B8%AD%E7%9A%84%E7%A1%AC%E7%BC%96%E7%A0%81%EF%BC%8C%E4%BB%8E%E8%80%8C%E6%8F%90%E9%AB%98%E5%AE%89%E5%85%A8%E6%80%A7%E3%80%82,%E6%AD%A5%E9%AA%A4%E5%8C%85%E6%8B%AC%E6%96%B0%E5%BB%BA%E7%B3%BB%E7%BB%9F%E5%8F%98%E9%87%8F%E5%B9%B6%E4%BD%BF%E7%94%A8os.getenv%E8%8E%B7%E5%8F%96%E5%85%B6%E5%80%BC%E3%80%82)
+---
 
-## Run pipeline
+## 📚 详细文档
 
-### Stage 1: Data Processing and Preparation
-1. Translate Data: Run the concurrent translation script `src/translate.py` (This step requires an API key).
-2. Augment Data: Use `src/data_aug.ipynb` to increase the number of samples for minority classes.
-3. Clean Data: Use the `notebook/data_aug_clean.ipynb` notebook to clean the translated text.
-4. Format for LLaMA-Factory: Use the `notebook/llama_fac.ipynb` notebook to convert the final CSV datasets into the required .jsonl format.
+| 文档 | 说明 |
+|------|------|
+| [problems_encountered.md](./task1/problems_encountered.md) | 开发过程中遇到的问题及解决方案 |
+| [notebook/](./task1/notebook/) | Jupyter Notebooks 用于数据探索和预处理 |
 
-### Stage 2: Train Baseline Model
+---
 
-TO DO
+## 📝 待办事项
+
+- [ ] 完善训练日志和评估报告
+- [ ] 添加模型权重下载链接
+- [ ] 补充 API 部署示例
+- [ ] 添加 Docker 配置
+- [ ] 性能基准测试报告
+
+---
+
+## 🙏 致谢
+
+- 数据集：[Amazon-Reviews-2023](https://huggingface.co/datasets/McAuley-Lab/Amazon-Reviews-2023) by McAuley-Lab
+- 模型：[Qwen3](https://qwenlm.github.io/) by Alibaba
+- 训练框架：[LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) by hiyouga
+
+---
+
+## 📄 许可证
+
+MIT License - 详见 [LICENSE](LICENSE) 文件
+
+---
+
+<div align="center">
+
+**如果觉得有用，请给个 ⭐ Star！**
+
+[📧 联系我](mailto:zcapy55@ucl.ac.uk) | [🌐 GitHub](https://github.com/Chenypovo)
+
+</div>

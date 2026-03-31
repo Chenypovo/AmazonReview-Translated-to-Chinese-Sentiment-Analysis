@@ -1,0 +1,85 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+env.bak/
+venv.bak/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# Data files (large)
+*.csv
+*.jsonl
+*.parquet
+data/
+!data/.gitkeep
+
+# Model weights
+*.bin
+*.pt
+*.pth
+*.ckpt
+weights/
+checkpoints/
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# LLaMA Factory outputs
+output/
+saves/
+data/processed/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# API keys and secrets
+*secret*
+*credential*
+credentials.json
