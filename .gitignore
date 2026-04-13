@@ -63,7 +63,9 @@ logs/
 # Environment variables
 .env
 .env.local
+.env.*
 .env.*.local
+!.env.example
 
 # OS
 .DS_Store
@@ -83,3 +85,9 @@ temp/
 *secret*
 *credential*
 credentials.json
+*.pem
+*.key
+*.p12
+*.crt
+id_rsa
+id_rsa.pub
